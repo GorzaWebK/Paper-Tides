@@ -6,7 +6,7 @@
 // flood warning, the tile under the cursor, tiles dropping in, birds, clouds and the
 // evening light. With reduced motion on, frames are only drawn when something changes.
 
-import { hexToPixel, pixelToHex, dirAngle, distance, neighbor } from './hex.js';
+import { hexToPixel, pixelToHex, dirAngle, distance } from './hex.js';
 import { hash2 } from './rng.js';
 import { TILES, PALETTE } from './tiles.js';
 import { LIGHTHOUSE_RANGE, protectedKeys } from './tide.js';
@@ -159,8 +159,8 @@ export class Renderer {
     const { left, right, top, bottom } = this.inset;
     const vw = Math.max(100, this.w - left - right);
     const vh = Math.max(100, this.h - top - bottom);
-    const iw = maxX - minX + HEX * 3;
-    const ih = maxY - minY + HEX * 3;
+    const iw = maxX - minX + HEX * 4;
+    const ih = maxY - minY + HEX * 4;
     this.cam.zoom = Math.max(0.35, Math.min(2.2, Math.min(vw / iw, vh / ih)));
     this.cam.x = (minX + maxX) / 2;
     this.cam.y = (minY + maxY) / 2;
@@ -248,7 +248,7 @@ export class Renderer {
     this.ripples = [];
     for (const c of g.board.cells.values()) {
       if (c.land) continue;
-      const n = 1 + Math.floor(hash2(c.q, c.r, 7) * 2);
+      const n = hash2(c.q, c.r, 7) < 0.55 ? 1 : 0;
       for (let i = 0; i < n; i++) {
         const [x, y] = hexToPixel(c.q, c.r, HEX);
         this.ripples.push({
@@ -332,15 +332,7 @@ export class Renderer {
     const opts = { patterns: this.settings.patterns, evening };
 
     // sea first, so land washes sit on top of it
-    for (const c of board.cells.values()) {
-      if (c.land) continue;
-      const [x, y] = hexToPixel(c.q, c.r, HEX);
-      ctx.save();
-      ctx.translate(x, y);
-      art.drawSeaCell(ctx, c, HEX, board);
-      ctx.restore();
-    }
-    if (art.drawSeaEdge) art.drawSeaEdge(ctx, board, HEX);
+    art.drawSea(ctx, board, HEX);
     for (const c of board.cells.values()) {
       if (!c.land) continue;
       const [x, y] = hexToPixel(c.q, c.r, HEX);
@@ -521,8 +513,9 @@ export class Renderer {
 
     // screen space: clouds, birds, evening tint
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const dt = Math.min(0.1, (now - (this.prevAmbient || now)) / 1000);
+    this.prevAmbient = now;
     if (!still) {
-      const dt = 1 / 30;
       for (const c of this.clouds) {
         c.x += c.speed * dt;
         if (c.x > 1.25) c.x = -0.25;
@@ -728,15 +721,7 @@ export function drawIsland(ctx, board, rect, opts = {}) {
   ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
   ctx.scale(s, s);
   ctx.translate(-(minX + maxX) / 2, -(minY + maxY) / 2);
-  for (const c of board.cells.values()) {
-    if (c.land) continue;
-    const [x, y] = hexToPixel(c.q, c.r, HEX);
-    ctx.save();
-    ctx.translate(x, y);
-    art.drawSeaCell(ctx, c, HEX, board);
-    ctx.restore();
-  }
-  if (art.drawSeaEdge) art.drawSeaEdge(ctx, board, HEX);
+  art.drawSea(ctx, board, HEX);
   for (const c of board.cells.values()) {
     if (!c.land) continue;
     const [x, y] = hexToPixel(c.q, c.r, HEX);
@@ -757,4 +742,3 @@ export function drawIsland(ctx, board, rect, opts = {}) {
   ctx.restore();
 }
 
-export { neighbor };

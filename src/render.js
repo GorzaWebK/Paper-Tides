@@ -65,6 +65,7 @@ export class Renderer {
     this.birds = [];
     this.clouds = [];
     this.paused = false;
+    this.interactive = false;
     this.seedAmbient();
   }
 
@@ -283,9 +284,10 @@ export class Renderer {
   }
 
   /** The tide took these cells: fade what was on them into the sea. */
-  floodCells(cells, points) {
+  floodCells(cells, points, delay = 0) {
     const now = performance.now();
-    if (!this.settings.reduceMotion) this.floods.push({ cells, start: now, dur: 1800 });
+    // until `delay` has passed the old tiles are drawn as they were, then fade into the sea
+    this.floods.push({ cells, start: now + delay, dur: this.settings.reduceMotion ? 1 : 1800 });
     if (points > 0 && cells.length) {
       let sx = 0;
       let sy = 0;
@@ -294,7 +296,7 @@ export class Renderer {
         sx += x;
         sy += y;
       }
-      this.popups.push({ x: sx / cells.length, y: sy / cells.length, text: `−${points} washed away`, start: now + 400, dur: 2200, small: true });
+      this.popups.push({ x: sx / cells.length, y: sy / cells.length, text: `−${points} washed away`, start: now + delay + 400, dur: 2200, small: true });
     }
     this.boardChanged();
   }
@@ -437,7 +439,7 @@ export class Renderer {
     }
 
     // lighthouse protection rings while a lighthouse is in hand
-    if (g.selectedType === 'lighthouse' && !g.finished) {
+    if (this.interactive && g.selectedType === 'lighthouse' && !g.finished) {
       ctx.save();
       for (const k of this.protect) {
         const [q, r] = k.split(',').map(Number);
@@ -681,12 +683,12 @@ function drawEvening(ctx, w, h, p) {
   const k = clamp01((p - 0.15) / 0.85);
   ctx.save();
   ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = k < 0.6 ? mixColor('#ffffff', '#fbe2bb', k / 0.6) : mixColor('#fbe2bb', '#efbf9c', (k - 0.6) / 0.4);
+  ctx.fillStyle = k < 0.6 ? mixColor('#ffffff', '#fce8c8', k / 0.6) : mixColor('#fce8c8', '#f4d0b2', (k - 0.6) / 0.4);
   ctx.fillRect(0, 0, w, h);
   if (k > 0.5) {
     const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
     v.addColorStop(0, 'rgba(255,255,255,0)');
-    v.addColorStop(1, `rgba(138,127,166,${0.35 * (k - 0.5) * 2})`);
+    v.addColorStop(1, `rgba(138,127,166,${0.28 * (k - 0.5) * 2})`);
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, w, h);
   }
@@ -714,13 +716,14 @@ export function drawIsland(ctx, board, rect, opts = {}) {
   const iw = maxX - minX + HEX * 4;
   const ih = maxY - minY + HEX * 4;
   const s = Math.min(rect.w / iw, rect.h / ih);
+  const ox = rect.x + rect.w / 2 - ((minX + maxX) / 2) * s;
+  const oy = rect.y + rect.h / 2 - ((minY + maxY) / 2) * s;
   ctx.save();
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
-  ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.translate(ox, oy);
   ctx.scale(s, s);
-  ctx.translate(-(minX + maxX) / 2, -(minY + maxY) / 2);
   art.drawSea(ctx, board, HEX);
   for (const c of board.cells.values()) {
     if (!c.land) continue;
@@ -740,5 +743,13 @@ export function drawIsland(ctx, board, rect, opts = {}) {
     ctx.restore();
   }
   ctx.restore();
+  // map a hex to canvas coordinates, for drawing on top
+  return {
+    scale: s,
+    at(q, r) {
+      const [x, y] = hexToPixel(q, r, HEX);
+      return [ox + x * s, oy + y * s];
+    },
+  };
 }
 

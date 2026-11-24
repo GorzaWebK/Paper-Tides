@@ -3,18 +3,245 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Paper Tides</title>
+    <title>Paper Tides – a calm island-building puzzle</title>
+    <meta name="description" content="Paper Tides is a calm, turn-based hex-tile puzzle. Grow a little coastal village on an island drawn in ink and watercolour, and keep it safe from the slow-rising tide. No timers, ever." />
+    <meta name="theme-color" content="#f4ecd8" />
+    <meta name="color-scheme" content="light" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Paper Tides" />
+    <meta property="og:description" content="A calm, turn-based hex-tile puzzle: grow a coastal village on an ink-and-watercolour island before the tide rises." />
+    <meta name="twitter:card" content="summary" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- Favicon drawn in code (inline SVG). main.js swaps in a watercolour canvas version once loaded. -->
+    <link
+      rel="icon"
+      id="favicon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23f4ecd8'/%3E%3Cpath d='M32 9 52 20.5v23L32 55 12 43.5v-23z' fill='%23a8c38a' stroke='%232b2a33' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M21 33h22l-4-9H25z' fill='%23c46a4a' stroke='%232b2a33' stroke-width='2.5' stroke-linejoin='round'/%3E%3Crect x='24' y='33' width='16' height='10' fill='%23fbf5e6' stroke='%232b2a33' stroke-width='2.5'/%3E%3Cpath d='M8 50q6-4 12 0t12 0 12 0 12 0' fill='none' stroke='%237fa7b5' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <canvas id="map"></canvas>
-    <aside id="logbook">
-      <div id="lb-stats"></div>
-      <div id="lb-hand"></div>
-      <div id="lb-preview"></div>
-      <div id="lb-goals"></div>
-      <button id="btn-rotate">Rotate (R)</button>
-      <button id="btn-undo">Undo (Z)</button>
-    </aside>
+    <!-- SVG filters for the hand-made look of stamps and torn paper -->
+    <svg class="defs" aria-hidden="true" focusable="false">
+      <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="3" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="stamp-ink" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="8" result="speck" />
+        <feColorMatrix in="speck" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45" result="mask" />
+        <feComposite in="SourceGraphic" in2="mask" operator="in" result="inked" />
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="5" result="n" />
+        <feDisplacementMap in="inked" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+
+    <canvas id="map" aria-label="Island map"></canvas>
+
+    <!-- In-game HUD: the logbook -->
+    <div id="hud" hidden>
+      <div class="lb-wrap">
+        <aside id="logbook" class="paper torn" aria-label="Logbook">
+          <header class="lb-head">
+            <div class="lb-island" id="lb-island">Island</div>
+            <div class="lb-mode hand" id="lb-mode">Standard run</div>
+          </header>
+          <div class="lb-stats">
+            <div class="stat" title="Turns">
+              <span class="label">Turn</span>
+              <span class="value"><span id="lb-turn">1</span><small id="lb-turns-of">/40</small></span>
+            </div>
+            <div class="stat stat-tide" id="stat-tide" title="Turns until the tide rises">
+              <span class="label">Tide</span>
+              <span class="value">
+                <svg class="tide-icon" id="tide-icon" viewBox="0 0 40 28" aria-hidden="true">
+                  <defs>
+                    <clipPath id="tide-clip"><rect id="tide-level" x="0" y="14" width="40" height="28" /></clipPath>
+                  </defs>
+                  <path class="tide-fill" clip-path="url(#tide-clip)" d="M2 14q4.5-5 9 0t9 0 9 0 9 0V27H2z" />
+                  <path class="tide-line" d="M2 14q4.5-5 9 0t9 0 9 0 9 0" />
+                  <path class="tide-line thin" d="M2 21q4.5-4 9 0t9 0 9 0 9 0" />
+                </svg>
+                <span id="lb-tide">8</span>
+              </span>
+            </div>
+            <div class="stat stat-score" title="Score">
+              <span class="label">Score</span>
+              <span class="value" id="lb-score">0</span>
+            </div>
+          </div>
+
+          <div class="lb-hand" id="lb-hand" role="radiogroup" aria-label="Tiles to place"></div>
+
+          <div class="lb-actions">
+            <button class="stamp small" id="btn-rotate" title="Rotate (R)"><span aria-hidden="true">↻</span> Rotate</button>
+            <button class="stamp small" id="btn-undo" title="Undo (Z)"><span aria-hidden="true">↶</span> Undo</button>
+          </div>
+
+          <div class="lb-note" id="lb-note" aria-live="polite"></div>
+
+          <div class="lb-goals">
+            <button class="lb-goals-head" id="lb-goals-toggle" aria-expanded="true"><span>Goals</span><span class="hand" id="lb-goals-count">0/3</span></button>
+            <ul id="lb-goals"></ul>
+          </div>
+          <button class="stamp small" id="btn-finish" hidden>Finish island</button>
+          <p class="lb-keys">1 2 3 pick · R turn · Z undo · M mute · Esc pause · arrows + Enter build</p>
+        </aside>
+      </div>
+
+      <div class="corner-buttons">
+        <button class="round" id="btn-pause" aria-label="Pause (Esc)" title="Pause (Esc)">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" /></svg>
+        </button>
+        <button class="round" id="btn-mute" aria-label="Mute (M)" title="Mute (M)">
+          <svg viewBox="0 0 24 24"><path class="note" d="M9 17V5l10-2v12" /><circle cx="6.5" cy="17" r="2.5" /><circle cx="16.5" cy="15" r="2.5" /><path class="slash" d="M3 3l18 18" /></svg>
+        </button>
+        <button class="round" id="btn-zoom-in" aria-label="Zoom in (+)" title="Zoom in (+)">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <button class="round" id="btn-zoom-out" aria-label="Zoom out (−)" title="Zoom out (−)">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14" /></svg>
+        </button>
+        <button class="round" id="btn-recentre" aria-label="Show the whole island" title="Show the whole island">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <!-- Main menu -->
+    <section id="screen-menu" class="screen" aria-label="Main menu">
+      <div class="screen-inner">
+        <div class="card-wrap">
+          <div class="journal torn">
+            <svg class="compass" viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="44" class="c-ring" />
+              <circle cx="50" cy="50" r="38" class="c-ring thin" />
+              <path class="c-tick" d="M50 6v8M50 86v8M6 50h8M86 50h8M19 19l5 5M76 76l5 5M81 19l-5 5M24 76l-5 5" />
+              <g class="needle">
+                <path class="n-north" d="M50 14 57 50H43z" />
+                <path class="n-south" d="M50 86 57 50H43z" />
+                <circle cx="50" cy="50" r="3.5" class="c-hub" />
+              </g>
+              <text x="50" y="27" class="c-n">N</text>
+            </svg>
+            <h1 class="title">Paper Tides</h1>
+            <p class="subtitle hand">a small island, a slow tide</p>
+            <nav class="menu-buttons">
+              <button class="stamp primary" data-action="standard">Standard run</button>
+              <button class="stamp" data-action="daily">Daily Island <small id="daily-date"></small></button>
+              <button class="stamp" data-action="zen">Zen mode</button>
+              <div class="menu-row">
+                <button class="stamp small" data-action="tutorial">How to play</button>
+                <button class="stamp small" data-action="settings">Settings</button>
+              </div>
+            </nav>
+            <dl class="records">
+              <div><dt>Best run</dt><dd id="rec-best">–</dd></div>
+              <div><dt>Today's island</dt><dd id="rec-daily">not yet sailed</dd></div>
+            </dl>
+          </div>
+        </div>
+        <!-- AdSense slot: main menu. Empty until an ad is placed; its height is reserved so the layout never jumps. Never shown during play. -->
+        <div class="ad-slot" id="ad-menu" aria-label="Advertisement"></div>
+      </div>
+    </section>
+
+    <!-- Pause -->
+    <section id="screen-pause" class="screen" aria-label="Paused" hidden>
+      <div class="screen-inner">
+        <div class="card-wrap">
+          <div class="journal torn small-card">
+            <h2>Resting a while</h2>
+            <p class="hand">The tide will wait for you.</p>
+            <nav class="menu-buttons">
+              <button class="stamp primary" data-action="resume">Carry on</button>
+              <button class="stamp" data-action="restart">Start this island again</button>
+              <button class="stamp" data-action="settings">Settings</button>
+              <button class="stamp" data-action="menu">Main menu</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="screen-settings" class="screen" aria-label="Settings" hidden>
+      <div class="screen-inner">
+        <div class="card-wrap">
+          <div class="journal torn small-card">
+            <h2>Settings</h2>
+            <form class="settings" id="settings-form" onsubmit="return false">
+              <label class="range"><span>Sound volume</span><input type="range" min="0" max="1" step="0.05" name="volume" /></label>
+              <label class="range"><span>Music volume</span><input type="range" min="0" max="1" step="0.05" name="music" /></label>
+              <label class="check"><input type="checkbox" name="muted" /><span class="box"></span><span>Mute everything <kbd>M</kbd></span></label>
+              <label class="check"><input type="checkbox" name="reduceMotion" /><span class="box"></span><span>Reduce motion</span></label>
+              <label class="check"><input type="checkbox" name="patterns" /><span class="box"></span><span>Colour-blind tile patterns</span></label>
+              <label class="check"><input type="checkbox" name="names" /><span class="box"></span><span>Show tile names on the map</span></label>
+            </form>
+            <nav class="menu-buttons">
+              <button class="stamp small" data-action="tutorial">Show the tutorial again</button>
+              <button class="stamp primary" data-action="back">Done</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tutorial -->
+    <section id="screen-tutorial" class="screen" aria-label="How to play" hidden>
+      <div class="screen-inner">
+        <div class="card-wrap">
+          <div class="journal torn tutorial">
+            <canvas id="tut-canvas" width="320" height="190" aria-hidden="true"></canvas>
+            <h2 id="tut-title">Your logbook</h2>
+            <p id="tut-text"></p>
+            <div class="tut-dots" id="tut-dots"></div>
+            <nav class="tut-nav">
+              <button class="stamp small" data-action="tut-skip">Skip</button>
+              <button class="stamp small" data-action="tut-back">Back</button>
+              <button class="stamp small primary" data-action="tut-next" id="tut-next">Next</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- End of run: the postcard -->
+    <section id="screen-end" class="screen" aria-label="Run finished" hidden>
+      <div class="screen-inner end-inner">
+        <div class="postcard-wrap">
+          <canvas id="postcard" width="900" height="600" aria-label="A postcard of your island"></canvas>
+        </div>
+        <div class="card-wrap">
+          <div class="journal torn end-card">
+            <h2 id="end-title">The day is done</h2>
+            <dl class="results">
+              <div><dt>Score</dt><dd id="end-score">0</dd></div>
+              <div><dt>Best</dt><dd id="end-best">0</dd></div>
+              <div id="end-daily-row"><dt>Daily Island</dt><dd id="end-daily">–</dd></div>
+            </dl>
+            <p class="hand end-note" id="end-note"></p>
+            <nav class="menu-buttons">
+              <button class="stamp primary" data-action="copy">Copy result</button>
+              <button class="stamp" data-action="again">Another island</button>
+              <button class="stamp" data-action="menu">Main menu</button>
+            </nav>
+          </div>
+        </div>
+        <!-- AdSense slot: end-of-run screen. Empty until an ad is placed; its height is reserved so the layout never jumps. Never shown during play. -->
+        <div class="ad-slot" id="ad-gameover" aria-label="Advertisement"></div>
+      </div>
+    </section>
+
+    <noscript><p class="noscript">Paper Tides needs JavaScript to draw its island.</p></noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

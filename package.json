@@ -1,0 +1,16 @@
+{
+  "name": "paper-tides",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A calm, turn-based hex-tile island building puzzle, drawn in ink and watercolour",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "node --test tests/"
+  },
+  "devDependencies": {
+    "vite": "7.2.2"
+  }
+}

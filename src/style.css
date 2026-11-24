@@ -1,0 +1,5 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: #f4ecd8; color: #2b2a33; font-family: Georgia, serif; }
+#map { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#logbook { position: fixed; left: 12px; top: 12px; bottom: 12px; width: 230px; background: rgba(251,245,230,.92); border: 1px solid #2b2a33; padding: 10px; overflow: auto; }
+#lb-hand button { display: block; width: 100%; margin: 4px 0; }
+#lb-hand button.sel { outline: 2px solid #c46a4a; }

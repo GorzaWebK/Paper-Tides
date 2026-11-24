@@ -282,6 +282,7 @@ function endRun() {
   });
   hoverHex = null;
   renderer.setHover(null);
+  $('toast').classList.remove('show');
   showScreen('end');
   renderer.fit();
 }

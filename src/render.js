@@ -356,7 +356,7 @@ export class Renderer {
       for (const c of board.cells.values()) {
         if (!c.land || !c.tile || this.hidden.has(`${c.q},${c.r}`)) continue;
         const [x, y] = hexToPixel(c.q, c.r, HEX);
-        drawName(ctx, TILES[c.tile.type].name, x, y + HEX * 0.62, HEX);
+        drawName(ctx, TILES[c.tile.type].name, x, y + HEX * 0.68, HEX);
       }
     }
   }
@@ -641,7 +641,7 @@ function drawTag(ctx, text, x, y, special) {
 
 function drawName(ctx, text, x, y, S) {
   ctx.save();
-  ctx.font = `${Math.round(S * 0.34)}px Fraunces, Lora, Georgia, serif`;
+  ctx.font = `600 ${Math.round(S * 0.26)}px Fraunces, Lora, Georgia, serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 3;

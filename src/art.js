@@ -284,7 +284,19 @@ export function drawSea(ctx, board, S) {
     return false;
   });
   pass(coastal, 1.18, 0.35, '#5f8c9c', 0.16);
-  // gentle variation in depth: soft-edged pools, no hard rims
+  // gentle variation in depth: soft-edged pools, no hard rims, kept to the water
+  ctx.beginPath();
+  for (const c of water) {
+    const x = S * Math.sqrt(3) * (c.q + c.r / 2);
+    const y = S * 1.5 * c.r;
+    for (let i = 0; i < 6; i++) {
+      const [px, py] = corner(i, S * 1.01);
+      if (i === 0) ctx.moveTo(x + px, y + py);
+      else ctx.lineTo(x + px, y + py);
+    }
+    ctx.closePath();
+  }
+  ctx.clip();
   for (let i = 0; i < 14; i++) {
     const c = water[Math.floor(rnd() * water.length)];
     if (!c) break;
